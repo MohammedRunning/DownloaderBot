@@ -9,7 +9,7 @@ from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 
 # Import our downloader module
-from downloader import download_video_async, INSTAGRAM_URL_PATTERN
+from downloader import download_video_async, INSTAGRAM_URL_PATTERN, TIKTOK_URL_PATTERN
 
 # Configure logging
 logging.basicConfig(
@@ -64,14 +64,13 @@ async def cmd_start(message: types.Message):
     Handler for /start command. Welcomes the user and explains how to use the bot.
     """
     welcome_text = (
-        "👋 **أهلاً بك في بوت تحميل فيديوهات إنستقرام!**\n\n"
+        "👋 **أهلاً بك في بوت تحميل فيديوهات إنستقرام وتيك توك!**\n\n"
         "وظيفة البوت بسيطة جداً وسريعة:\n"
-        "1. أرسل لي أي رابط فيديو، Reel، أو Post من إنستقرام.\n"
+        "1. أرسل لي أي رابط فيديو من إنستقرام (Reel, Post) أو تيك توك.\n"
         "2. وسأقوم بتحميل الفيديو وإرساله لك مباشرة بجودة عالية. 📥\n\n"
-        "⚡ **الروابط المدعومة:**\n"
-        "• Instagram Reels\n"
-        "• Instagram Posts (Video)\n"
-        "• Instagram Videos\n\n"
+        "⚡ **المنصات المدعومة:**\n"
+        "• Instagram (Reels, Posts, Videos)\n"
+        "• TikTok (Videos, Share links, Short links)\n\n"
         "أرسل الرابط الآن للبدء! 👇"
     )
     await message.reply(welcome_text)
@@ -83,33 +82,36 @@ async def cmd_help(message: types.Message):
     """
     help_text = (
         "💡 **طريقة الاستخدام:**\n"
-        "قم بنسخ رابط الفيديو من تطبيق إنستقرام وأرسله هنا مباشرة.\n\n"
+        "قم بنسخ رابط الفيديو من تطبيق إنستقرام أو تيك توك وأرسله هنا مباشرة.\n\n"
         "**أمثلة على الروابط المقبولة:**\n"
         "• `https://www.instagram.com/reel/xxxx/`\n"
-        "• `https://www.instagram.com/p/xxxx/`\n\n"
+        "• `https://vt.tiktok.com/xxxx/` أو `https://www.tiktok.com/@user/video/xxxx`\n\n"
         "⚠️ **ملاحظة:** البوت يدعم الفيديوهات العامة فقط. الحسابات الخاصة (Private) قد لا تعمل."
     )
     await message.reply(help_text)
 
 @dp.message()
-async def handle_instagram_links(message: types.Message):
+async def handle_media_links(message: types.Message):
     """
-    Core handler that detects and processes Instagram links.
+    Core handler that detects and processes Instagram and TikTok links.
     """
     text = message.text or ""
     
-    # Search for Instagram URL in the message
-    url_match = INSTAGRAM_URL_PATTERN.search(text)
-    if not url_match:
+    # Search for Instagram or TikTok URL in the message
+    insta_match = INSTAGRAM_URL_PATTERN.search(text)
+    tiktok_match = TIKTOK_URL_PATTERN.search(text)
+    
+    if not insta_match and not tiktok_match:
         # If private chat, guide the user. Otherwise, ignore messages in groups
         if message.chat.type == "private":
             await message.reply(
-                "❌ عذراً، لم أجد رابط إنستقرام صالح في رسالتك.\n"
-                "يرجى إرسال رابط Reel أو Post يحتوي على فيديو."
+                "❌ عذراً، لم أجد رابط إنستقرام أو تيك توك صالح في رسالتك.\n"
+                "يرجى إرسال رابط فيديو صالح للبدء."
             )
         return
         
-    url = url_match.group(0)
+    # Use the matched URL
+    url = (insta_match or tiktok_match).group(0)
     
     # 1. Status: Extraction
     progress_msg = await message.reply("📥 جاري استخراج الفيديو...")
@@ -168,7 +170,7 @@ async def handle_instagram_links(message: types.Message):
             logger.debug(f"Failed to delete progress message: {e}")
             
     except Exception as e:
-        logger.error(f"Error handling Instagram download: {e}")
+        logger.error(f"Error handling media download: {e}")
         try:
             await progress_msg.edit_text(f"❌ **حدث خطأ أثناء تحميل الفيديو:**\n\n`{str(e)}`")
         except Exception as edit_err:
